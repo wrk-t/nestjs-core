@@ -1,0 +1,73 @@
+{
+  "name": "@esmaeel_emadi/nestjs-core",
+  "version": "0.1.0",
+  "description": "Core NestJS infrastructure: repository layer, base service, request context, error utilities, and interfaces for multi-tenant applications.",
+  "license": "MIT",
+  "author": "emadi68moh@gmail.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/EsmaeelEmadi/nestjs-core"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./*": "./dist/*"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist",
+    "format": "npx @biomejs/biome format --write .",
+    "lint": "npx @biomejs/biome lint --write .",
+    "check": "npx @biomejs/biome check --write .",
+    "hooks:install": "npx lefthook install",
+    "prepublishOnly": "pnpm build"
+  },
+  "peerDependencies": {
+    "@nestjs-cls/transactional": ">=3",
+    "@nestjs-cls/transactional-adapter-drizzle-orm": ">=1",
+    "@nestjs/common": ">=10",
+    "@nestjs/event-emitter": ">=3",
+    "bcrypt": ">=5",
+    "drizzle-orm": ">=0.30",
+    "express": ">=4",
+    "jsonwebtoken": ">=9",
+    "nestjs-cls": ">=6"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.15",
+    "@nestjs-cls/transactional": "^3.2.1",
+    "@nestjs-cls/transactional-adapter-drizzle-orm": "^1.2.4",
+    "@nestjs/common": "^11.1.24",
+    "@nestjs/event-emitter": "^3.1.0",
+    "@types/bcrypt": "^6",
+    "@types/express": "^5",
+    "@types/jsonwebtoken": "^9",
+    "@types/node": "^25.9.1",
+    "bcrypt": "^6.0.0",
+    "drizzle-orm": "^0.45.2",
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
+    "lefthook": "^1.11.13",
+    "nestjs-cls": "^6.2.1",
+    "typescript": "^6.0.3"
+  },
+  "keywords": [
+    "nestjs",
+    "drizzle",
+    "repository",
+    "multi-tenant",
+    "scoping",
+    "crud",
+    "cls",
+    "orm"
+  ]
+}
