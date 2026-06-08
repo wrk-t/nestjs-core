@@ -14,10 +14,7 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { IBaseDrizzleRepository } from "../interface/drizzle";
 import type { TBasePgTable } from "../interface/postgres";
 import type { ScopeMap } from "../context/request.context";
-import {
-  AbstractBaseDrizzleRepository,
-  type ILogService,
-} from "./abstract-drizzle-repository";
+import { AbstractBaseDrizzleRepository } from "./abstract-drizzle-repository";
 
 /** A map of resource name → effective scopes for the current user. */
 export type { ScopeMap } from "../context/request.context";
@@ -84,7 +81,7 @@ export abstract class BasePostgresRepository<
 
   protected defaultSortColumn: keyof T["$inferSelect"] = "createdAt";
 
-  protected tableName: string = "";
+  protected tableName = "";
 
   protected includeMap: Record<string, IncludeValue> = {};
 
