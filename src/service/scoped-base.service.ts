@@ -1,4 +1,3 @@
-import type { Logger } from "@nestjs/common";
 import type { SQL } from "drizzle-orm";
 import type {
   TBasePgTable,
@@ -12,7 +11,11 @@ import type { RequestContext } from "../context/request.context";
  * Projects provide their own if they want $trl_ key resolution.
  */
 export interface ITranslationService {
-  resolveTranslations<T>(record: T, locale: string, tenantId?: string | null): Promise<T>;
+  resolveTranslations<T>(
+    record: T,
+    locale: string,
+    tenantId?: string | null,
+  ): Promise<T>;
 }
 
 /**
@@ -24,7 +27,7 @@ export abstract class ScopedBaseService<
   // biome-ignore lint/suspicious/noExplicitAny: generic repo type
   Repo extends BasePostgresRepository<any, T>,
 > {
-  abstract logger: Logger;
+  abstract logger: any;
   repo: Repo;
 
   protected resourceName: string;
@@ -72,7 +75,10 @@ export abstract class ScopedBaseService<
     error: Record<string, unknown>,
   ): { getStatus: () => number; message: string } | undefined {
     if (error?.code === "23505") {
-      return { getStatus: () => 409, message: "Duplicate value violates a unique constraint" };
+      return {
+        getStatus: () => 409,
+        message: "Duplicate value violates a unique constraint",
+      };
     }
     if (error?.code === "23514") {
       return { getStatus: () => 400, message: "Validation failed" };
@@ -100,13 +106,15 @@ export abstract class ScopedBaseService<
 
   async deleteBulk(query: SQL) {
     const result = await this.repo.deleteBulk(query);
-    if (result.length === 0) return { getStatus: () => 404, message: "Not found" };
+    if (result.length === 0)
+      return { getStatus: () => 404, message: "Not found" };
     return result;
   }
 
   async deleteBulkByIds(ids: string[]) {
     const result = await this.repo.deleteBulkByIds(ids);
-    if (result.length === 0) return { getStatus: () => 404, message: "Not found" };
+    if (result.length === 0)
+      return { getStatus: () => 404, message: "Not found" };
     return result;
   }
 

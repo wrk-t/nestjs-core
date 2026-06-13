@@ -37,3 +37,7 @@ export {
 
 // ── Filter ─────────────────────────────────────────────────
 export { GlobalHttpExceptionFilter } from "./filter/global-http-exception.filter";
+
+// ── Access Control ────────────────────────────────────────
+export { AccessControlService } from "./access-control/access-control.service";
+export type { OwnerResult } from "./access-control/access-control.service";
