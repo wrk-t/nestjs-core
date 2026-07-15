@@ -52,7 +52,7 @@ export abstract class AbstractBaseDrizzleRepository<
     return condition ? and(tenantFilter, condition) : tenantFilter;
   }
 
-  protected async execute<R>(
+  public async execute<R>(
     process: (db: DB) => Promise<R>,
     action: string,
   ): Promise<R> {

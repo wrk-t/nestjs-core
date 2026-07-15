@@ -1,23 +1,18 @@
 import type { ClsService } from "nestjs-cls";
 
-/**
- * Permission scope levels used for access control.
- */
 export type TScope = "own" | "tenant" | "all";
 
-/**
- * A map of resource name → effective scopes for the current user.
- * Built by AuthGuard after resolving role_permission assignments.
- */
 export type ScopeMap = Record<string, TScope[]>;
 
-/**
- * RequestContext — CLS-based storage for the current request's
- * user, tenant, roles, locale, and permission scope map.
- *
- * Populated by AuthGuard during request authentication.
- * Read by repositories and services to apply data scoping.
- */
+export interface RequestContextData {
+  userId?: string;
+  tenantId?: string;
+  workspaceType?: "personal" | "organization";
+  roles?: Array<{ id: string; name?: string; displayName?: string }>;
+  isSuperAdmin?: boolean;
+  locale?: string;
+}
+
 export class RequestContext {
   constructor(private readonly cls: ClsService) {}
 
@@ -55,6 +50,14 @@ export class RequestContext {
     return this.cls.get<ScopeMap>("scopeMap") ?? {};
   }
 
+  getWorkspaceType(): "personal" | "organization" | undefined {
+    return this.cls.get<"personal" | "organization">("workspaceType");
+  }
+
+  isPersonalWorkspace(): boolean {
+    return this.getWorkspaceType() === "personal";
+  }
+
   // ── Setters ────────────────────────────────────────────────
 
   setUserId(userId: string): void {
@@ -79,21 +82,18 @@ export class RequestContext {
     this.cls.set("locale", locale);
   }
 
+  setWorkspaceType(type: "personal" | "organization"): void {
+    this.cls.set("workspaceType", type);
+  }
+
   setScopeMap(scopeMap: ScopeMap): void {
     this.cls.set("scopeMap", scopeMap);
   }
 
-  // ── Bulk ───────────────────────────────────────────────────
-
-  setFromRequest(data: {
-    userId?: string;
-    tenantId?: string;
-    roles?: Array<{ id: string; name?: string; displayName?: string }>;
-    isSuperAdmin?: boolean;
-    locale?: string;
-  }): void {
+  setFromRequest(data: RequestContextData): void {
     if (data.userId) this.setUserId(data.userId);
     if (data.tenantId) this.setTenantId(data.tenantId);
+    if (data.workspaceType) this.setWorkspaceType(data.workspaceType);
     if (data.roles) this.setRoles(data.roles);
     if (data.isSuperAdmin !== undefined)
       this.setIsSuperAdmin(data.isSuperAdmin);

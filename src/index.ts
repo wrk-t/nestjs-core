@@ -1,8 +1,9 @@
 // ── Repository ─────────────────────────────────────────────
 export { AbstractBaseDrizzleRepository } from "./repository/abstract-drizzle-repository";
 export type { ILogService } from "./repository/abstract-drizzle-repository";
-export { BasePostgresRepository } from "./repository/base-repository";
-export type { ScopeContext } from "./repository/base-repository";
+export { BasePostgresRepository } from "./repository/base-postgres-repository";
+export type { ScopeContext } from "./repository/base-postgres-repository";
+export type { IncludeValue, IncludeKeysOf } from "./repository/base-postgres-repository";
 export { Repository } from "./repository/repository";
 
 // ── Service ────────────────────────────────────────────────
@@ -14,9 +15,19 @@ export { RequestContext } from "./context/request.context";
 export type { TScope, ScopeMap } from "./context/request.context";
 
 // ── Utils ──────────────────────────────────────────────────
-export { isError, isSuccess, unwrapOrThrow } from "./utils/error";
+export { isError, isSuccess, unwrapOrThrow, catchToResult, handleAuthError, unwrapOr } from "./utils/error";
 export type { ServiceResult } from "./utils/error";
 export { hashPassword, comparePassword } from "./utils/password";
+
+// ── Validation ──────────────────────────────────────────────
+export { ValidationPipe } from "./validation/validation-pipe";
+export { MetaValidation, META_VALIDATION_KEY } from "./validation/meta-validation.decorator";
+
+// ── Decorators ──────────────────────────────────────────────
+export { Roles, ROLES_KEY, Role } from "./decorator/roles.decorator";
+
+// ── Guards ──────────────────────────────────────────────────
+export { RolesGuard } from "./guard/roles.guard";
 
 // ── Interface ──────────────────────────────────────────────
 export type { IBaseDrizzleRepository } from "./interface/drizzle";

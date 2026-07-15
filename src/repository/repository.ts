@@ -9,7 +9,7 @@ import type {
   TPgDBTransactionAdapter,
 } from "../interface/postgres";
 import type { ILogService } from "./abstract-drizzle-repository";
-import { BasePostgresRepository } from "./base-repository";
+import { BasePostgresRepository } from "./base-postgres-repository";
 
 /**
  * CLS-aware repository with automatic scope resolution from the

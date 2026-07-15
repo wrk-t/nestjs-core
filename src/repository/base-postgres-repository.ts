@@ -23,6 +23,7 @@ export interface ScopeContext {
   userId?: string;
   tenantId?: string;
   isSuperAdmin?: boolean;
+  /** Resolved permission scope map from role_permissions (set by AuthGuard). */
   scopeMap?: ScopeMap;
 }
 
@@ -31,9 +32,16 @@ export interface ScopeContext {
  * - A static Drizzle `with` config fragment (backward-compatible)
  * - A function that receives scope context and returns the config fragment
  */
-type IncludeValue =
+export type IncludeValue =
   | Record<string, unknown>
   | ((scope: ScopeContext) => Record<string, unknown>);
+
+/**
+ * Extract include keys from a repository's includeMap.
+ */
+export type IncludeKeysOf<Repo> = Repo extends { includeMap: infer M }
+  ? keyof M & string
+  : never;
 
 function deepMerge(
   target: Record<string, unknown>,
@@ -74,23 +82,73 @@ export abstract class BasePostgresRepository<
 
   // ── Config (overridden by subclasses) ──────────────────────
 
-  // biome-ignore lint/suspicious/noExplicitAny: generic infrastructure
+  /**
+   * Maps filter DTO field names to functions that build SQL conditions.
+   * Each subclass overrides this to define its filterable fields.
+   *
+   * @example
+   *   {
+   *     roleId: (value) => eq(users.roleId, value),
+   *     status: (value) => eq(users.status, value),
+   *   }
+   */
+  // biome-ignore lint/suspicious/noExplicitAny: generic infrastructure code
   protected filterableFields: Record<string, (value: any) => SQL> = {};
 
+  /**
+   * Columns that can be searched via the `search` query parameter.
+   */
   protected searchableColumns: (keyof T["$inferSelect"])[] = [];
 
+  /**
+   * Default column to sort by when no `sortBy` is provided.
+   */
   protected defaultSortColumn: keyof T["$inferSelect"] = "createdAt";
 
   protected tableName = "";
 
+  /**
+   * Maps include keys to Drizzle `with` config fragments.
+   * Each subclass overrides this to define its relation includes.
+   *
+   * Values can be:
+   * - A static Drizzle `with` config (backward-compatible)
+   * - A function that receives `ScopeContext` and returns the config,
+   *   allowing scope-aware `where` clauses at each relation level.
+   *
+   * @example
+   *   // Static (backward-compatible)
+   *   "role": { role: true },
+   *
+   *   // Scope-aware function
+   *   "memberships": (ctx) => ({
+   *     memberships: {
+   *       where: ctx.userId && !ctx.isSuperAdmin
+   *         ? and(eq(membership.userId, ctx.userId))
+   *         : undefined,
+   *       with: { tenant: true },
+   *     },
+   *   }),
+   */
   protected includeMap: Record<string, IncludeValue> = {};
 
+  /**
+   * Build the scope context from CLS or other available sources.
+   * Override in child classes that have access to ClsService/RequestContext.
+   */
   protected getScopeContext(): ScopeContext {
     return {};
   }
 
   /**
    * Parse a comma-separated include string into a Drizzle `with` config.
+   *
+   * Uses the subclass's `includeMap` to resolve each key to a Drizzle
+   * `with` config fragment.
+   *
+   * @example
+   *   parseInclude(["memberships.role", "profile"])
+   *   -> { memberships: { with: { role: true } }, profile: true }
    */
   parseInclude(include?: string[]): Record<string, unknown> | undefined {
     if (!include || include.length === 0) return undefined;
@@ -108,6 +166,9 @@ export abstract class BasePostgresRepository<
     return Object.keys(withConfig).length > 0 ? withConfig : undefined;
   }
 
+  /**
+   * Build WHERE conditions from a filters object using `filterableFields`.
+   */
   // biome-ignore lint/suspicious/noExplicitAny: generic filters
   createConditionalFilters(filters: Record<string, any>) {
     const conds: SQL[] = [];
@@ -264,6 +325,7 @@ export abstract class BasePostgresRepository<
 
       if (conditionalFilters) conditions.push(conditionalFilters);
 
+      // Auto-filter soft-deleted records unless includeDeleted is explicitly true
       if (!includeDeleted && "deletedAt" in this.table) {
         conditions.push(isNull(this.table.deletedAt));
       }
