@@ -3,7 +3,10 @@ export { AbstractBaseDrizzleRepository } from "./repository/abstract-drizzle-rep
 export type { ILogService } from "./repository/abstract-drizzle-repository";
 export { BasePostgresRepository } from "./repository/base-postgres-repository";
 export type { ScopeContext } from "./repository/base-postgres-repository";
-export type { IncludeValue, IncludeKeysOf } from "./repository/base-postgres-repository";
+export type {
+  IncludeValue,
+  IncludeKeysOf,
+} from "./repository/base-postgres-repository";
 export { Repository } from "./repository/repository";
 
 // ── Service ────────────────────────────────────────────────
@@ -15,13 +18,39 @@ export { RequestContext } from "./context/request.context";
 export type { TScope, ScopeMap } from "./context/request.context";
 
 // ── Utils ──────────────────────────────────────────────────
-export { isError, isSuccess, unwrapOrThrow, catchToResult, handleAuthError, unwrapOr } from "./utils/error";
+export {
+  isError,
+  isSuccess,
+  unwrapOrThrow,
+  catchToResult,
+  handleAuthError,
+  unwrapOr,
+} from "./utils/error";
 export type { ServiceResult } from "./utils/error";
 export { hashPassword, comparePassword } from "./utils/password";
+export { parseDatabaseError } from "./utils/error-parser";
+
+// ── Scope ──────────────────────────────────────────────────
+export { createScopeFilter } from "./scope/create-scope-filter";
+export type { ScopeColumns } from "./scope/create-scope-filter";
+export {
+  createIncludeInjector,
+  supportsWhere,
+  isFalseSQL,
+} from "./scope/include-injector";
+export type {
+  RelationDef,
+  RelationType,
+  IncludeInjector,
+  IncludeInjectorDeps,
+} from "./scope/include-injector";
 
 // ── Validation ──────────────────────────────────────────────
 export { ValidationPipe } from "./validation/validation-pipe";
-export { MetaValidation, META_VALIDATION_KEY } from "./validation/meta-validation.decorator";
+export {
+  MetaValidation,
+  META_VALIDATION_KEY,
+} from "./validation/meta-validation.decorator";
 
 // ── Decorators ──────────────────────────────────────────────
 export { Roles, ROLES_KEY, Role } from "./decorator/roles.decorator";

@@ -18,16 +18,9 @@ export interface ILogger {
   verbose?(message: any, ...optionalParams: any[]): void;
 }
 import { I18nContext } from "nestjs-i18n";
-import type {
-  TBasePgTable,
-} from "../interface/postgres";
+import type { TBasePgTable } from "../interface/postgres";
 import type { BasePostgresRepository } from "../repository/base-postgres-repository";
 import type { RequestContext } from "../context/request.context";
-
-// ── Shared types ──────────────────────────────────────────────
-
-/** CRUD action names used in permission checks ({resource}:{action}). */
-export type TAction = "create" | "read" | "update" | "delete";
 
 /**
  * Optional translation service interface.
@@ -42,10 +35,12 @@ export interface ITranslationService {
 }
 
 /**
- * Generic CRUD service with built-in permission checks, translated error
- * handling, and DB error mapping.
+ * Generic CRUD service with translated error handling and DB error mapping.
  *
- * Every entity service in the project extends this base class.
+ * Row-level scoping is handled at the repository layer via the scope registry.
+ * No permission checks are performed here — access control is enforced by
+ * the scope filter (`buildScopeFilter`) which returns `sql`false`` when
+ * a user lacks permissions on a resource.
  *
  * @example
  * ```ts
@@ -70,39 +65,6 @@ export abstract class ScopedBaseService<
   protected requestContext?: RequestContext;
   translationService?: ITranslationService;
 
-  // ──────────────────────────────────────────────────────────────
-  // Permission check — uses {resource}:{action} scope map entries
-  //
-  // Subclasses can override `skipPermissionCheck` to make specific
-  // actions available to any authenticated user (replaces the old
-  // `guardCreate: []` pattern).
-  // ──────────────────────────────────────────────────────────────
-
-  /** Actions that skip the permission check (any authenticated user can perform). */
-  protected skipPermissionCheck: TAction[] = [];
-
-  protected checkPermission(action: TAction): ForbiddenDto | undefined {
-    // Fail-closed: deny access when RequestContext is missing
-    if (!this.requestContext) {
-      this.logger?.warn(
-        `checkPermission called without RequestContext for resource "${this.resourceName}"`,
-      );
-      return this.forbiddenErr({ reason: "no_request_context" });
-    }
-    if (this.requestContext.getIsSuperAdmin()) return undefined;
-    if (this.skipPermissionCheck.includes(action)) return undefined;
-
-    const key = `${this.resourceName}:${action}`;
-    const scopes = this.requestContext.getScopesForResource(key);
-
-    if (scopes.length > 0) return undefined;
-    return this.forbiddenErr({
-      action,
-      requiredPermission: key,
-      reason: "insufficient_permission",
-    });
-  }
-
   constructor(
     repo: Repo,
     requestContext?: RequestContext,
@@ -118,43 +80,11 @@ export abstract class ScopedBaseService<
   }
 
   // ──────────────────────────────────────────────────────────────
-  // Guard hooks — override in child services for custom logic
-  //
-  // Default implementations delegate to checkPermission().
-  // Child services can override to add custom validation before
-  // create / update / delete / recover operations.
-  // ──────────────────────────────────────────────────────────────
-
-  /** Override to add custom validation before create. */
-  // biome-ignore lint/suspicious/noExplicitAny: flexible return type for guards
-  protected guardCreate(data: T["$inferInsert"]): any {
-    return this.checkPermission("create");
-  }
-
-  /** Override to add custom validation before update. */
-  // biome-ignore lint/suspicious/noExplicitAny: flexible return type for guards
-  protected guardUpdate(
-    id: string,
-    existing: T["$inferSelect"],
-    data: Partial<T["$inferInsert"]>,
-  ): any {
-    return this.checkPermission("update");
-  }
-
-  /** Override to add custom validation before delete. */
-  // biome-ignore lint/suspicious/noExplicitAny: flexible return type for guards
-  protected guardDelete(id: string, existing: T["$inferSelect"]): any {
-    return this.checkPermission("delete");
-  }
-
-  /** Override to add custom validation before recover (undo soft-delete). */
-  // biome-ignore lint/suspicious/noExplicitAny: flexible return type for guards
-  protected guardRecover(id: string, existing: T["$inferSelect"]): any {
-    return this.checkPermission("update");
-  }
-
-  // ──────────────────────────────────────────────────────────────
   // Error helpers — produce translated, resource-aware error DTOs
+  //
+  // Subclasses use these to return typed errors instead of throwing.
+  // Controllers unwrap with `unwrapOrThrow` to convert errors to HTTP
+  // responses.
   // ──────────────────────────────────────────────────────────────
 
   /**
@@ -186,8 +116,7 @@ export abstract class ScopedBaseService<
   }
 
   /**
-   * Return a NotFoundDto with a resource-aware translated message
-   * and debug details for server-side logging.
+   * Return a NotFoundDto with a resource-aware translated message.
    */
   protected notFoundErr(detail?: Record<string, unknown>): NotFoundDto {
     const message = this.trl(
@@ -202,8 +131,7 @@ export abstract class ScopedBaseService<
   }
 
   /**
-   * Return an InternalServerErrorDto with a resource+operation-aware
-   * translated message and debug details for server-side logging.
+   * Return an InternalServerErrorDto with a resource+operation-aware message.
    */
   protected internalErr(
     operation: string,
@@ -222,8 +150,7 @@ export abstract class ScopedBaseService<
   }
 
   /**
-   * Return a ForbiddenDto with a resource-aware translated message
-   * and debug details for server-side logging.
+   * Return a ForbiddenDto with a resource-aware translated message.
    */
   protected forbiddenErr(detail?: Record<string, unknown>): ForbiddenDto {
     const message = this.trl(
@@ -242,8 +169,8 @@ export abstract class ScopedBaseService<
   // ──────────────────────────────────────────────────────────────
 
   protected handleConflictError(error: Record<string, unknown>) {
-    if (error?.code === "23505") {
-      const constraint = (error.constraint as string) ?? "";
+    if (this.pgCode(error) === "23505") {
+      const constraint = this.pgConstraint(error) ?? "";
       const i18n = I18nContext.current();
       const key = `constraints.${constraint}` as const;
       const message =
@@ -256,8 +183,8 @@ export abstract class ScopedBaseService<
   }
 
   protected handleValidationError(error: Record<string, unknown>) {
-    if (error?.code === "23514") {
-      const constraint = (error.constraint as string) ?? "";
+    if (this.pgCode(error) === "23514") {
+      const constraint = this.pgConstraint(error) ?? "";
       const i18n = I18nContext.current();
       const key = `constraints.${constraint}` as const;
       const message =
@@ -269,21 +196,35 @@ export abstract class ScopedBaseService<
     return this.internalErr("validate", { cause: error, reason: "db_error" });
   }
 
+  /**
+   * Extract the PostgreSQL error code from a DB error, accounting for
+   * Drizzle transaction wrappers that nest the original error under `cause`.
+   */
+  private pgCode(error: Record<string, unknown>): string | undefined {
+    const code = error?.code as string | undefined;
+    if (code) return code;
+    const cause = error?.cause as Record<string, unknown> | undefined;
+    return cause?.code as string | undefined;
+  }
+
+  /**
+   * Extract the PostgreSQL constraint name, handling nested errors.
+   */
+  private pgConstraint(error: Record<string, unknown>): string | undefined {
+    const c = error?.constraint as string | undefined;
+    if (c) return c;
+    const cause = error?.cause as Record<string, unknown> | undefined;
+    return cause?.constraint as string | undefined;
+  }
+
   protected handleDbError(error: Record<string, unknown>) {
     if (error instanceof HttpException) throw error;
-    this.logger?.error(`DB error on ${this.resourceName}:`, error);
-    if (error?.code === "23505") return this.handleConflictError(error);
-    if (error?.code === "23514") return this.handleValidationError(error);
-    if (error?.code === "23503")
-      return this.internalErr("db_operation", {
-        cause: error,
-        reason: "foreign_key_violation",
-        detail: (error as any)?.detail,
-      });
+    if (this.pgCode(error) === "23505") return this.handleConflictError(error);
+    if (this.pgCode(error) === "23514")
+      return this.handleValidationError(error);
     return this.internalErr("db_operation", {
       cause: error,
       reason: "db_error",
-      detail: (error as any)?.message,
     });
   }
 
@@ -292,8 +233,6 @@ export abstract class ScopedBaseService<
   // ──────────────────────────────────────────────────────────────
 
   async softDeleteOne(query?: SQL | undefined) {
-    const guardErr = this.checkPermission("delete");
-    if (guardErr) return guardErr;
     const r = await this.repo.softDeleteOne(query);
     if (!r) return this.internalErr("soft_delete");
     return r;
@@ -302,31 +241,25 @@ export abstract class ScopedBaseService<
   async softDeleteOneById(id: string) {
     const existing = await this.repo.selectOneById(id);
     if (!existing) return this.notFoundErr({ id });
-    const guardErr = this.guardDelete(id, existing);
-    if (guardErr) return guardErr;
     const r = await this.repo.softDeleteOneById(id);
     if (!r) return this.internalErr("soft_delete", { id });
     return r;
   }
 
   async deleteBulk(query: SQL) {
-    const guardErr = this.checkPermission("delete");
-    if (guardErr) return guardErr;
     const result = await this.repo.deleteBulk(query);
     if (result.length === 0) return this.notFoundErr({ query: String(query) });
     return result;
   }
 
   async deleteBulkByIds(ids: string[]) {
-    const guardErr = this.checkPermission("delete");
-    if (guardErr) return guardErr;
     const result = await this.repo.deleteBulkByIds(ids);
     if (result.length === 0) return this.notFoundErr({ ids });
     return result;
   }
 
   // ──────────────────────────────────────────────────────────────
-  // FIND (read — no permission check; row-level scoping handles it)
+  // FIND (row-level scoping handles access control)
   // ──────────────────────────────────────────────────────────────
 
   async selectOne(query: SQL) {
@@ -395,8 +328,6 @@ export abstract class ScopedBaseService<
 
   async createOne(data: T["$inferInsert"]) {
     try {
-      const guardErr = this.guardCreate(data);
-      if (guardErr) return guardErr;
       const r = await this.repo.createOne(data);
       if (!Array.isArray(r) || r.length === 0) {
         return this.internalErr("create");
@@ -414,10 +345,6 @@ export abstract class ScopedBaseService<
     >[],
   ) {
     try {
-      for (const item of data) {
-        const guardErr = this.guardCreate(item as T["$inferInsert"]);
-        if (guardErr) return guardErr;
-      }
       return await this.repo.createBulk(data);
     } catch (error) {
       return this.handleDbError(error as Record<string, unknown>);
@@ -435,8 +362,6 @@ export abstract class ScopedBaseService<
     >,
   ) {
     try {
-      const guardErr = this.checkPermission("update");
-      if (guardErr) return guardErr;
       const r = await this.repo.updateOne(query, data);
       if (!r) return this.internalErr("update");
       return r;
@@ -454,8 +379,6 @@ export abstract class ScopedBaseService<
     try {
       const existing = await this.repo.selectOneById(id);
       if (!existing) return this.notFoundErr({ id });
-      const guardErr = this.guardUpdate(id, existing, data);
-      if (guardErr) return guardErr;
       const r = await this.repo.updateOneById(id, data);
       if (!r) return this.internalErr("update", { id });
       return r;
@@ -472,8 +395,6 @@ export abstract class ScopedBaseService<
     try {
       const existing = await this.repo.selectOneById(id);
       if (!existing) return this.notFoundErr({ id });
-      const guardErr = this.guardRecover(id, existing);
-      if (guardErr) return guardErr;
       const r = await this.repo.updateOneById(id, {
         // @ts-expect-error FIXME: deletedAt is omitted from the update type
         deletedAt: null,

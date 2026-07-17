@@ -311,7 +311,7 @@ export abstract class BasePostgresRepository<
     includeDeleted?: boolean;
   }): Promise<{
     data: T["$inferSelect"][];
-    total: number | null;
+    total: number;
     page: number;
     limit: number | null;
     totalPages: number | null;

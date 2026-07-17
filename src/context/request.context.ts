@@ -1,4 +1,5 @@
-import type { ClsService } from "nestjs-cls";
+import { Injectable, Logger } from "@nestjs/common";
+import { ClsService } from "nestjs-cls";
 
 export type TScope = "own" | "tenant" | "all";
 
@@ -13,7 +14,10 @@ export interface RequestContextData {
   locale?: string;
 }
 
+@Injectable()
 export class RequestContext {
+  private readonly logger = new Logger(RequestContext.name);
+
   constructor(private readonly cls: ClsService) {}
 
   // ── Getters ────────────────────────────────────────────────

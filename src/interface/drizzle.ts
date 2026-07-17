@@ -27,7 +27,7 @@ export interface IBaseDrizzleRepository<T extends TBasePgTable> {
     include?: string[];
   }): Promise<{
     data: T["$inferSelect"][];
-    total: number | null;
+    total: number;
     page: number;
     limit: number | null;
     totalPages: number | null;
