@@ -32,6 +32,11 @@ export interface ITranslationService {
     locale: string,
     tenantId?: string | null,
   ): Promise<T>;
+  resolveTranslationsBatch<T>(
+    records: T[],
+    locale: string,
+    tenantId?: string | null,
+  ): Promise<T[]>;
 }
 
 /**
@@ -78,6 +83,35 @@ export abstract class ScopedBaseService<
       (repo as unknown as { tableName?: string }).tableName ??
       repo.constructor.name;
   }
+
+  // ──────────────────────────────────────────────────────────────
+  // Guard hooks — override in child services for custom validation
+  //
+  // Default implementations are no-ops (access control is handled
+  // at the repository layer via scope registry). Child services can
+  // override to add custom validation before create/update/delete/
+  // recover operations.
+  // ──────────────────────────────────────────────────────────────
+
+  /** Override to add custom validation before create. */
+  // biome-ignore lint/suspicious/noExplicitAny: flexible return type for guards
+  protected guardCreate(data: T["$inferInsert"]): any { return undefined; }
+
+  /** Override to add custom validation before update. */
+  // biome-ignore lint/suspicious/noExplicitAny: flexible return type for guards
+  protected guardUpdate(
+    id: string,
+    existing: T["$inferSelect"],
+    data: Partial<T["$inferInsert"]>,
+  ): any { return undefined; }
+
+  /** Override to add custom validation before delete. */
+  // biome-ignore lint/suspicious/noExplicitAny: flexible return type for guards
+  protected guardDelete(id: string, existing: T["$inferSelect"]): any { return undefined; }
+
+  /** Override to add custom validation before recover (undo soft-delete). */
+  // biome-ignore lint/suspicious/noExplicitAny: flexible return type for guards
+  protected guardRecover(id: string, existing: T["$inferSelect"]): any { return undefined; }
 
   // ──────────────────────────────────────────────────────────────
   // Error helpers — produce translated, resource-aware error DTOs
@@ -305,21 +339,36 @@ export abstract class ScopedBaseService<
     sortOrder?: "asc" | "desc";
     include?: string[] | readonly string[];
     includeDeleted?: boolean;
-    translation?: boolean;
   }) {
-    const result = await this.repo.findMany(filters);
+    return await this.repo.findMany(filters);
+  }
 
-    if (filters.translation && this.translationService && this.requestContext) {
+  /**
+   * Fetch all records (no pagination) and resolve `$trl_` translation keys
+   * in a single batch DB round-trip.
+   *
+   * Designed for metadata queries (forms, tables, screens, blueprints, etc.)
+   * where the full dataset is small and every record may contain translation
+   * keys. Not suitable for large transactional tables.
+   */
+  async findManyWithTranslations() {
+    const records = await this.repo.selectAll();
+
+    if (
+      this.translationService &&
+      this.requestContext &&
+      records.length > 0
+    ) {
       const locale = this.requestContext.getLocale();
       const tenantId = this.requestContext.getTenantId();
-      result.data = await Promise.all(
-        result.data.map((item) =>
-          this.translationService!.resolveTranslations(item, locale, tenantId),
-        ),
+      return await this.translationService.resolveTranslationsBatch(
+        records,
+        locale,
+        tenantId,
       );
     }
 
-    return result;
+    return records;
   }
 
   // ──────────────────────────────────────────────────────────────
