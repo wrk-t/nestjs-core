@@ -43,19 +43,19 @@ export async function catchToResult<T>(
 
 export type ServiceResult<T> = T | HttpException;
 
-export const unwrapOrThrow = <T>(value: T): Exclude<T, Error> => {
-  if (value instanceof Error) {
+export const unwrapOrThrow = <T>(value: T): Exclude<T, HttpException> => {
+  if (isError(value)) {
     throw value;
   }
-  return value as Exclude<T, Error>;
+  return value as Exclude<T, HttpException>;
 };
 
 export const unwrapOr = <T, F>(
   value: T,
   fallbackValue: F,
-): Exclude<T | F, Error> => {
-  if (value instanceof Error) {
-    return fallbackValue as Exclude<T | F, Error>;
+): Exclude<T | F, HttpException> => {
+  if (isError(value)) {
+    return fallbackValue as Exclude<T | F, HttpException>;
   }
-  return value as Exclude<T | F, Error>;
+  return value as Exclude<T | F, HttpException>;
 };
